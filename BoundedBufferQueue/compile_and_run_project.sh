@@ -1,5 +1,3 @@
-echo "Compiling Project..."
+echo "Compiling and running project with default TP/TC values..."
 g++ --std=c++11 main.cpp -o project1
-
-echo "Running Project with default values (5, 5)"
 ./project1 5 5

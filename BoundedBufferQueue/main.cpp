@@ -3,7 +3,7 @@
 //  BoundedBufferQueue
 //
 //  Created by Erick Castro on 10/28/18.
-//
+//  CSCI 144 - Project 1
 
 #include <cstdlib>
 #include <iostream>
@@ -21,8 +21,8 @@ class threadQueue {
     vector<thread> producers;
     vector<thread> consumers;
     
-    mutex mtx;
-    mutex coutMtx;
+    mutex mtx;      // Lock used for main operation
+    mutex coutMtx;  // Lock used for "cout" operations
     
     int counter = 0;
     int items[MAX];
@@ -45,12 +45,15 @@ public:
     void consumerFunction();
     void coutWithLock(string str);
     
+    // Sets sleep time limit given from user input
     void setSleepTimers(int p, int c){
         producerSleep = p;
         consumerSleep = c;
     }
     
     // Initializes threads
+    // - calls producer/consumer functions
+    // - terminates threads after completion of operations (not reached in this project's case)
     void startThreads(){
         for(int i = 0; i < 10; i++){
             coutMtx.lock();
@@ -69,7 +72,7 @@ public:
         terminateThreads();
     }
     
-    // Terminates threads by joining them
+    // Terminates threads
     void terminateThreads(){
         for(auto& thread : producers){
             coutMtx.lock();
@@ -85,6 +88,8 @@ public:
         }
     }
     
+    // Try to insert an item. If the queue
+    // is full, return false; otherwise return true.
     bool tryInsert(int item){
         bool success = false;
         
@@ -98,6 +103,8 @@ public:
         return success;
     }
     
+    // Try to remove an item. If the queue is
+    // empty, return false; otherwise return true
     bool tryRemove(int *item){
         bool success = false;
         
@@ -113,16 +120,19 @@ public:
 
 };
 
+// Used to do "cout" operations without interrupts from other threads
 void threadQueue::coutWithLock(string str){
     coutMtx.lock();
     cout << str << endl;
     coutMtx.unlock();
 }
 
+// Infinite loop that attempts to insert items
+// - sleeps for a random number (0 - TP)
+// - TP (producer sleep time limit) comes from user input #1
 void threadQueue::producerFunction()
 {
     producerThreadIds[this_thread::get_id()] = producerIds++;
-    stringstream ss;
     while(true){
         coutMtx.lock();
         cout << "Item #" << counter << " produced by thread " << producerThreadIds[this_thread::get_id()] << endl;
@@ -132,6 +142,9 @@ void threadQueue::producerFunction()
     }
 }
 
+// Infinite loop that attempts to remove items
+// - sleeps for a random number (0 - TC)
+// - TP (producer sleep time limit) comes from user input #2
 void threadQueue::consumerFunction()
 {
     consumerThreadIds[this_thread::get_id()] = consumerIds++;
@@ -150,11 +163,21 @@ void threadQueue::consumerFunction()
 
 
 
-
+// Main program
+// - Sets thread sleep time limits and starts threads
 int main(int argc, const char * argv[]) {
+    
     srand(time(NULL));
-    int TP = atoi(argv[1]); // sleep time range limit for producing threads
-    int TC = atoi(argv[2]); // sleep time range limit for consuming threads
+    int TP = atoi(argv[1]); // sleep time range limit for producer threads
+    int TC = atoi(argv[2]); // sleep time range limit for consumer threads
+    
+    if(TP <= 0){
+        cout << "Error: TP value needs to be an integer greater than 0" << endl;
+        return 0;
+    } else if(TC <= 0) {
+        cout << "Error: TC value needs to be an integer greater than 0" << endl;
+        return 0;
+    }
     
     threadQueue queue;
     queue.setSleepTimers(TP, TC);
