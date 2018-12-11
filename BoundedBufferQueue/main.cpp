@@ -11,6 +11,7 @@
 #include <mutex>
 #include <vector>
 #include <sstream>
+#include <queue>
 #include <unordered_map>
 using namespace std;
 
@@ -25,25 +26,26 @@ class threadQueue {
     mutex coutMtx;  // Lock used for "cout" operations
     
     int counter = 0;
-    int items[MAX];
-    int front;
-    int nextEmpty;
     
     int producerSleep;
     int consumerSleep;
     
     int producerIds = 1;
     int consumerIds = 1;
+    
+    queue<int> bbq;
     unordered_map<thread::id, int> producerThreadIds;
     unordered_map<thread::id, int> consumerThreadIds;
     
 public:
-    threadQueue(){front = nextEmpty = 0;}
+    threadQueue(){}
     ~threadQueue(){};
     
+    void printQueue(queue<int> q);
     void producerFunction();
     void consumerFunction();
     void coutWithLock(string str);
+    int getCounter();
     
     // Sets sleep time limit given from user input
     void setSleepTimers(int p, int c){
@@ -94,37 +96,86 @@ public:
         bool success = false;
         
         mtx.lock();
-        if((nextEmpty - front) < MAX){
-            items[nextEmpty % MAX] = item;
-            nextEmpty++;
+        if(bbq.size() < MAX){
+            bbq.push(item);
+            
+//            coutMtx.lock();
+            cout << "Item #" << item << " produced by thread " << producerThreadIds[this_thread::get_id()] << endl;
+//            coutMtx.unlock();
+            
+            printQueue(bbq);
+            
             success = true;
+        } else {
+            coutWithLock("Can't insert anymore, Queue is full");
         }
+//        if((nextEmpty - front) < MAX){
+//            items[nextEmpty % MAX] = item;
+//            nextEmpty++;
+//            success = true;
+//        }
         mtx.unlock();
         return success;
     }
     
     // Try to remove an item. If the queue is
     // empty, return false; otherwise return true
-    bool tryRemove(int *item){
+    bool tryRemove(){
         bool success = false;
         
         mtx.lock();
-        if(front < nextEmpty) {
-            *item = items[front % MAX];
-            front++;
+        if(bbq.size() > 0){
+//            cout << "Popping item #" << bbq.front() << endl;
+            
+//            coutMtx.lock();
+            cout << "Item #" << bbq.front() << " consumed by thread " << consumerThreadIds[this_thread::get_id()] << endl;
+//            coutMtx.unlock();
+            
+            bbq.pop();
+            
+            printQueue(bbq);
+
+            
             success = true;
         }
+//        if(front < nextEmpty) {
+//            *item = items[front % MAX];
+//            front++;
+//            success = true;
+//        }
         mtx.unlock();
         return success;
     }
 
 };
 
+// Prints the contents of the queue
+void threadQueue::printQueue(queue<int> q)
+{
+    cout << "Queue: ";
+    while (!q.empty())
+    {
+        cout << q.front() << " ";
+        q.pop();
+    }
+    cout << endl;
+}
+
 // Used to do "cout" operations without interrupts from other threads
 void threadQueue::coutWithLock(string str){
     coutMtx.lock();
     cout << str << endl;
     coutMtx.unlock();
+}
+
+// Increments and returns counter when called to be inserted into queue
+int threadQueue::getCounter(){
+    counter++;
+    if(counter > 10){
+        counter = 1;
+    }
+//    cout << "Counter: " << counter << endl;
+    return counter;
 }
 
 // Infinite loop that attempts to insert items
@@ -134,11 +185,8 @@ void threadQueue::producerFunction()
 {
     producerThreadIds[this_thread::get_id()] = producerIds++;
     while(true){
-        coutMtx.lock();
-        cout << "Item #" << counter << " produced by thread " << producerThreadIds[this_thread::get_id()] << endl;
-        coutMtx.unlock();
-        tryInsert(counter++);
-        this_thread::sleep_for(chrono::seconds(rand() % producerSleep));
+        if(!tryInsert(getCounter()))
+            this_thread::sleep_for(chrono::seconds(rand() % producerSleep));
     }
 }
 
@@ -148,19 +196,12 @@ void threadQueue::producerFunction()
 void threadQueue::consumerFunction()
 {
     consumerThreadIds[this_thread::get_id()] = consumerIds++;
-    int item;
     while(true){
-        if(tryRemove(&item)){
-            coutMtx.lock();
-            cout << "Item #" << item << " consumed by thread " << consumerThreadIds[this_thread::get_id()] << endl;
-            coutMtx.unlock();
-        }
-        else
+        if(!tryRemove())
             coutWithLock("Nothing there.");
         this_thread::sleep_for(chrono::seconds(rand() % consumerSleep));
     }
 }
-
 
 
 // Main program
