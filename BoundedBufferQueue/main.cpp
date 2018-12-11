@@ -15,25 +15,29 @@
 #include <unordered_map>
 using namespace std;
 
+// Max amount of items in the queue
+// This sets the queue size!
 const int MAX = 10;
 
 class threadQueue {
+    
+    queue<int> bbq;         // Queue
 
     vector<thread> producers;
     vector<thread> consumers;
     
-    mutex mtx;      // Lock used for main operation
-    mutex coutMtx;  // Lock used for "cout" operations
     
-    int counter = 0;
+    mutex mtx;              // Lock used for main operation
+    mutex coutMtx;          // Lock used for "cout" operations
     
-    int producerSleep;
-    int consumerSleep;
+    static int counter;     // Used as item to be inserted into queue
     
+    int producerSleep;      // Upper sleep time limit for producers set by user
+    int consumerSleep;      // Upper sleep time limit for consumers set by user
+    
+    // Section below is used to assign simple IDs to threads according to their thread ID
     int producerIds = 1;
     int consumerIds = 1;
-    
-    queue<int> bbq;
     unordered_map<thread::id, int> producerThreadIds;
     unordered_map<thread::id, int> consumerThreadIds;
     
@@ -71,7 +75,7 @@ public:
             consumers.push_back(thread(&threadQueue::consumerFunction, this));
         }
         
-        terminateThreads();
+        terminateThreads(); // Only terminates initial thread but not worker threads
     }
     
     // Terminates threads
@@ -98,23 +102,14 @@ public:
         mtx.lock();
         if(bbq.size() < MAX){
             bbq.push(item);
-            
-//            coutMtx.lock();
             cout << "Item #" << item << " produced by thread " << producerThreadIds[this_thread::get_id()] << endl;
-//            coutMtx.unlock();
-            
             printQueue(bbq);
-            
             success = true;
         } else {
             coutWithLock("Can't insert anymore, Queue is full");
         }
-//        if((nextEmpty - front) < MAX){
-//            items[nextEmpty % MAX] = item;
-//            nextEmpty++;
-//            success = true;
-//        }
         mtx.unlock();
+        
         return success;
     }
     
@@ -125,29 +120,20 @@ public:
         
         mtx.lock();
         if(bbq.size() > 0){
-//            cout << "Popping item #" << bbq.front() << endl;
-            
-//            coutMtx.lock();
+            // cout << "Popping item #" << bbq.front() << endl;
             cout << "Item #" << bbq.front() << " consumed by thread " << consumerThreadIds[this_thread::get_id()] << endl;
-//            coutMtx.unlock();
-            
             bbq.pop();
-            
             printQueue(bbq);
-
-            
             success = true;
         }
-//        if(front < nextEmpty) {
-//            *item = items[front % MAX];
-//            front++;
-//            success = true;
-//        }
         mtx.unlock();
+        
         return success;
     }
 
 };
+
+int threadQueue::counter = 0;
 
 // Prints the contents of the queue
 void threadQueue::printQueue(queue<int> q)
@@ -171,10 +157,12 @@ void threadQueue::coutWithLock(string str){
 // Increments and returns counter when called to be inserted into queue
 int threadQueue::getCounter(){
     counter++;
-    if(counter > 10){
+    if(counter > MAX){
         counter = 1;
+        return counter;
     }
-//    cout << "Counter: " << counter << endl;
+
+    // cout << "Counter: " << counter << endl;
     return counter;
 }
 
