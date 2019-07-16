@@ -1,7 +1,7 @@
 # Bounded Buffer Queue
 #### CSCI 144
 
-**OS**: macOS Mojave (10.14)
+**OS**: macOS Mojave (10.14)  
 **Compiler**: Xcode, g++/C++11
 
 ### How to run:
